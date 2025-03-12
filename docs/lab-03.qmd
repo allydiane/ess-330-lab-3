@@ -17,6 +17,8 @@ data = read_csv('https://raw.githubusercontent.com/nytimes/covid-19-data/master/
 #Question 2:
 
 ```{r}
+
+covid = read_csv('https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv')
 my.date <- as.Date("2022-02-01")
 class(my.date)
 
@@ -60,7 +62,7 @@ library(dplyr)
 library(readr)
 
 pop_url <- ('https://www2.census.gov/programs-surveys/popest/datasets/2020-2023/counties/totals/co-est2023-alldata.csv')
-population_data <- read_csv(pop_url) %>%
+population_data <- read_csv(pop_url)
   
 print(head(population_data))
 print(colnames(population_data))
@@ -79,11 +81,11 @@ glimpse(population_data)
 #This data shows ALL of the covid cases in all of the counties in the state of Colorado. It also shows data like population count in 2021, birth and death rates, the number of actual births and deaths, and so on. 
 
 ```{r}
-names(pop)
-dim(pop)
-nrow(pop)
-str(pop)
-glimpse(pop)
+names(population_data)
+dim(population_data)
+nrow(population_data)
+str(population_data)
+glimpse(population_data)
 ```
 
 ```{r population-range, message=FALSE, warning=FALSE}
@@ -170,7 +172,7 @@ percent_deaths <- pop_joined %>%
   filter(year == 2021) %>%
   group_by(fips) %>%
   summarise(deaths = sum(deaths)) %>%
-  left_join(pop, c("fips")) %>%
+  left_join(population_data, c("fips" = "FIPS")) %>%
   mutate(covid_percentage = (deaths / DEATHS2021 * 100)) %>%
   select(CTYNAME, deaths, covid_percentage, DEATHS2021) %>%
   filter(covid_percentage >= 20)
@@ -206,7 +208,7 @@ ggplot(state_covid, aes(x = date)) +
 ```
 
 ```{r}
-pp = pop %>%
+pp = population_data %>%
   group_by(STNAME) |> 
   summarise(state_pop = sum(POPESTIMATE2021)) |>
   inner_join(state_covid, by = c("STNAME"="state")) %>%
@@ -228,16 +230,17 @@ ggplot(pp, aes(x = date)) +
 #Question 7: 
 ```{r}
 library(maps)
-meta = read_csv('https://raw.githubusercontent.com/mikejohnson51/csu-ess-330/refs/heads/main/resources/county-centroids.csv') %>%
-  inner_join(covid) %>%
+cases_meta = read_csv('https://raw.githubusercontent.com/mikejohnson51/csu-ess-330/refs/heads/main/resources/county-centroids.csv') %>%
+  inner_join(covid) %>% 
   group_by(date) %>%
-  summarise(wmX_c = sum(LON*cases) / sum(cases), 
+  summarise(wmX_c = sum(LON*cases) / sum(cases),
             wmY_c = sum(LAT*cases) / sum(cases), 
             cases = sum(cases)) %>%
   arrange(date) |>
   mutate(d = 1:n())
 
-ggplot(meta) + borders("state", fill = "lightblue", colour = "white") + 
+p_cases =
+  ggplot(cases_meta) + borders("state", fill = "lightblue", colour = "white") + 
   geom_point(aes(x = wmX_c, y = wmY_c, size = cases), color = "darkblue", alpha = .25) + 
   theme_linedraw() + 
   labs(color = "Time", 
@@ -245,6 +248,8 @@ ggplot(meta) + borders("state", fill = "lightblue", colour = "white") +
        x = "", y = "", 
        title = "Weighted Center of COVID Cases") + 
   theme(legend.position = "none")
+
+p_cases
 ```
 
 #On this map, you can see where the concentrated mean moved across the midwest into some southern states. There are also some hotspots that show transition west. This is likely due to the travelling that was occurring at this time, and was causing new areas to become more concentrated. 
@@ -254,50 +259,25 @@ ggplot(meta) + borders("state", fill = "lightblue", colour = "white") +
 ```{r}
 library(ggplot2)
 library(patchwork)
-meta = read_csv('https://raw.githubusercontent.com/mikejohnson51/csu-ess-330/refs/heads/main/resources/county-centroids.csv') %>%
-  cases_meta <- meta %>%
+meta = read_csv('https://raw.githubusercontent.com/mikejohnson51/csu-ess-330/refs/heads/main/resources/county-centroids.csv') 
+
+deaths_meta <- meta %>%
   inner_join(covid, by = "fips") %>%
   group_by(date) %>%
   summarise(
-    wmX_cases = sum(LON*daily_new_cases) / sum(daily_new_cases), 
-    wmY_cases = sum(LAT*daily_new_cases) / sum(daily_new_cases), 
-    cases = sum(daily_new_cases)
+    wmX_d = sum(LON*deaths) / sum(deaths),
+    wmY_d = sum(LAT*deaths) / sum(deaths), 
+    deaths = sum(deaths)
   ) %>%
   arrange(date)
 
-deaths_meta <- meta %>%
-  inner_join(colorado, by = 'fips') %>%
-  group_by(date) %>%
-  summarise(
-    wmX_deaths = sum(LON*new_deaths, na.rm = TRUE) / sum(new_deaths, na.rm = TRUE), 
-    wmY_deaths = sum(LAT*new_deaths, na.rm = TRUE) / sum(new_deaths, na.rm = TRUE),
-    deaths = sum(new_deaths, na.rm = TRUE)
-  ) %>%
-  arrange(date)
-
-p_cases <- ggplot(cases_meta) + 
+p_deaths <- ggplot(deaths_meta) + 
   borders("state", fill = "lightblue", colour = "white") + 
-  geom_point(aes(x = wmX_cases, y = wmY_cases, size = cases), color = "red", aplha = 0.5) + 
-  theme_linedraw() + 
-  labs(title = "Weighted Center of COVID Cases", x = "", y = "", size = "Cases") + 
-  theme(legend.position = "none")
-
-p_deatha <- ggplot(deaths_meta) + 
-  borders("state", fill = "lightblue", colour = "white") + 
-  geom_point(aes(x = wmX_deaths, y = wmY_deaths, size = deaths), color = "red", aplha = 0.5) + 
+  geom_point(aes(x = wmX_d, y = wmY_d, size = deaths), color = "red", alpha = 0.5) + 
   theme_linedraw() + 
   labs(title = "Weighted Center of COVID Cases", x = "", y = "", size = "Deaths") + 
   theme(legend.position = "none")
+
 (p_cases | p_deaths)
+
 ```
-
-
-
-
-
-
-
-
-
-
-
